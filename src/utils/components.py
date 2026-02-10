@@ -120,6 +120,10 @@ def merge_components_by_contour_prior_on_data(
     super_index = I_merged[I]
     data.super_index = super_index
     
+    # Watch out for higher level partition - I have mb taken shortcuts here for the first level
+    partition_energy = compute_partition_energy(reg, super_index, X_cp, X_merged, W_cp)
+    print(f"Partition energy: {partition_energy}")
+    
     cluster_size = data.super_index.bincount()
     pointer = torch.cat((
         torch.tensor([0], dtype=torch.long, device=data.super_index.device),
@@ -151,3 +155,12 @@ def wcc_by_max_propagation_on_data(
     data.super_index = I
 
     return data
+
+def compute_partition_energy(reg, super_index, X, X_merged, W_cp):
+    Y_cp = X_merged[super_index]
+    
+    fidelity_term = torch.norm(X - Y_cp, dim=1, p=2).sum()
+    contour_penalty_term = reg*W_cp.sum()
+    
+    return fidelity_term + contour_penalty_term
+    

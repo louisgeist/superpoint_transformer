@@ -1,0 +1,102 @@
+# @package _global_
+
+defaults:
+  - /experiment/partition/s3dis_ezsp.yaml
+
+ckpt_path: no_weights
+
+datamodule:
+  pretrained_cnn_ckpt_path: ckpt/ezsp_partition_s3dis_fold5.ckpt
+  
+  pre_transform:
+      - transform: DataTo
+        params:
+          device: 'cuda'
+      - transform: SaveNodeIndex
+        params:
+          key: 'sub'
+      - transform: GridSampling3D  # might OOM on CUDA if voxel and GPU memory too small
+        params:
+          size: ${datamodule.voxel}
+          quantize_coords: ${datamodule.quantize_coords} # These quantized coordinates won't be used for training, but for val
+          hist_key: 'y'
+          hist_size: ${eval:'${datamodule.num_classes} + 1'}
+          chunk_size: 10000000  # reduce if OOM on CUDA for small GPU
+      # Sets correctly colorattribute (rgb, hsv, lab)
+      - transform: PointFeatures
+        params:
+          keys: ${datamodule.point_hf_preprocess}
+          overwrite: ${datamodule.point_hf_overwrite}
+      - transform: GroundElevation
+        params:
+          model: ${datamodule.ground_model}
+          z_threshold: ${datamodule.ground_threshold}
+          xy_grid: ${datamodule.ground_xy_grid}
+          scale: ${datamodule.ground_scale}
+      - transform: KNN
+        params:
+          k: ${datamodule.contour_prior_knn}
+          r_max: ${datamodule.contour_prior_knn_r}
+          verbose: False
+      - transform: AdjacencyGraph
+        params:
+          k: ${datamodule.contour_prior_knn}
+          w: -1
+
+
+  on_device_val_transform:
+    - transform: Cast
+    - transform: QuantizePointCoordinates
+      params:
+        size: ${eval:'${datamodule.voxel} if ${datamodule.quantize_coords} else -1'}
+
+    - transform: KNN
+      params:
+        k: ${datamodule.contour_prior_knn}
+        r_max: ${datamodule.contour_prior_knn_r}
+        verbose: False
+    - transform: AdjacencyGraph
+      params:
+        k: ${datamodule.contour_prior_knn}
+        w: -1
+
+
+    - transform: PretrainedCNN
+      params:
+        ckpt_path: ${datamodule.pretrained_cnn_ckpt_path}
+        partition_hf: ${datamodule.partition_hf}
+        first_stage:
+          _target_: src.nn.stage.PointStage
+          in_mlp: null
+          use_pos: False
+          use_diameter_parent: False
+          cnn_blocks: True
+          cnn: ${eval:'ListConfig(${model.net.point_cnn})'}
+          cnn_kernel_size: ${model.net.point_cnn_kernel_size}
+          cnn_dilation: ${model.net.point_cnn_dilation}
+          cnn_norm: ${model.net.point_cnn_norm}
+          cnn_activation: ${model.net.point_cnn_activation}
+          
+          cnn_residual: False
+          cnn_global_residual: False
+
+        device: 'cuda'
+
+    # - transform: CutPursuitPartition
+    #   params:
+    #     regularization: ${datamodule.contour_prior_reg} # ${datamodule.contour_prior_reg_list}
+    #     spatial_weight: 0
+    #     cutoff: ${datamodule.contour_prior_min_size}
+    #     iterations: 15
+
+    - transform: GreedyContourPriorPartition 
+      params:
+        reg: ${datamodule.contour_prior_reg}
+        min_size: ${datamodule.contour_prior_min_size}
+        edge_weight_mode: ${datamodule.contour_prior_edge_weight_mode}
+        edge_reduce: ${datamodule.contour_prior_edge_reduce}
+        k: ${datamodule.contour_prior_k_isolated}
+        w_adjacency: 0.0
+        max_iterations: -1
+        verbose: ${datamodule.contour_prior_verbose}
+        sharding: ${datamodule.contour_prior_sharding}

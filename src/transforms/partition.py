@@ -207,7 +207,7 @@ class CutPursuitPartition(Transform):
             coor_weights[:n_dim] *= sw
 
             # Partition computation
-            super_index, x_c, cluster, edges, times = cp_d0_dist(
+            super_index, x_c, cluster, edges, objective, times = cp_d0_dist(
                 n_dim + n_feat,
                 x,
                 source_csr,
@@ -222,6 +222,7 @@ class CutPursuitPartition(Transform):
                 verbose=self.verbose,
                 max_num_threads=num_threads,
                 balance_parallel_split=True,
+                compute_Obj=True,
                 compute_Time=True,
                 compute_List=True,
                 compute_Graph=True)
@@ -260,7 +261,9 @@ class CutPursuitPartition(Transform):
                 edge_index=edge_index,
                 edge_attr=edge_attr,
                 sub=Cluster(pointer, value),
-                node_size=node_size_new)
+                node_size=node_size_new,
+                partition_energy=torch.tensor(objective[-1].item(), device=device))
+            print(f"Partition energy: {d2.partition_energy}")
 
             # Merge the lower level's instance annotations, if any
             if d1.obj is not None and isinstance(d1.obj, InstanceData):
