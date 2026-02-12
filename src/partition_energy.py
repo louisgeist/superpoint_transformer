@@ -112,15 +112,22 @@ def evaluate(cfg: DictConfig) -> Tuple[dict, dict]:
     
     dataset = datamodule.val_dataset
     
+    cm = model.partition_val_cm
     
     for i, sample in enumerate(dataset):
         print(f"Processing sample {i} of {len(dataset)}")
         
         sample = sample.to("cuda")
         sample = datamodule.on_device_val_transform(sample)
+        
+        y_oracle = sample[1].y[:, :model.num_classes].argmax(dim=1)
+        cm.update(pred=y_oracle, 
+                  target=sample[1].y)
         print(sample)
-        break
 
+    print(f"OmIoU: {cm.miou().item():.4f}")
+    print(f"OA: {cm.oa().item():.4f}")
+    print(f"mAcc: {cm.macc().item():.4f}")
     # log.info("Starting testing!")
     # trainer.test(model=model, datamodule=datamodule, ckpt_path=cfg.ckpt_path)
 
