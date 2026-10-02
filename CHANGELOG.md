@@ -45,6 +45,12 @@ This dependency is now installed by `install.sh`.
 was written into every row instead of only the row of each node (eg
 `[[5, 1, 0], [0, 2, 7]]` gave `[[6, 0, 9], [6, 0, 9]]` instead of
 `[[6, 0, 0], [0, 0, 9]]`)
+- `RandomAnisotropicScale` no longer inflates the `std_off` and `mean_dist`
+edge features by ~sqrt(3) at train time. They were multiplied by
+`scale.norm()` (~sqrt(3) for a ~(1, 1, 1) scale), causing a train/eval shift
+and pushing `std_off` beyond its clip value of 2. They are now scaled by the
+isotropic equivalent of the scale, `scale.norm() / sqrt(3)`, with a square
+root for `mean_dist`, and `std_off` is clipped like at preprocessing time
 
 ### Removed
 
