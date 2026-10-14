@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- Hybrid `Muon` optimizer (`src/optim/muon.py`, see
+[docs/muon.md](docs/muon.md)): Muon (Jordan et al. 2024) on the 2D hidden
+weights, with the AdamW-compatible update scaling and decoupled weight decay
+of Liu et al. 2025, and AdamW on the other parameters (biases, norms,
+classification heads, EZ-SP 3D CNN kernels). It can replace the AdamW
+optimizer of any experiment with `+optimizer=muon`, reusing its `lr` and
+`weight_decay`. The default optimizer is unchanged
+
 ### Changed
 
 - Moved the graph connected components and graph partitioning algorithms 
